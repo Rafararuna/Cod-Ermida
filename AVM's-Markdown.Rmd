@@ -1,0 +1,316 @@
+---
+title: "Análises AVM's Simples"
+author: "Quadra Urbana"
+date: "12/08/2021"
+output: pdf_document
+---
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+library(readxl)
+library(tidyverse)
+library(knitr)
+
+rm_accent <- function(str,pattern="all") {
+  # Rotinas e funções úteis V 1.0
+  # rm.accent - REMOVE ACENTOS DE PALAVRAS
+  # Função que tira todos os acentos e pontuações de um vetor de strings.
+  # Parâmetros:
+  # str - vetor de strings que terão seus acentos retirados.
+  # patterns - vetor de strings com um ou mais elementos indicando quais acentos deverão ser retirados.
+  #            Para indicar quais acentos deverão ser retirados, um vetor com os símbolos deverão ser passados.
+  #            Exemplo: pattern = c("´", "^") retirará os acentos agudos e circunflexos apenas.
+  #            Outras palavras aceitas: "all" (retira todos os acentos, que são "´", "`", "^", "~", "¨", "ç")
+  if(!is.character(str))
+    str <- as.character(str)
+  
+  pattern <- unique(pattern)
+  
+  if(any(pattern=="Ç"))
+    pattern[pattern=="Ç"] <- "ç"
+  
+  symbols <- c(
+    acute = "áéíóúÁÉÍÓÚýÝ",
+    grave = "àèìòùÀÈÌÒÙ",
+    circunflex = "âêîôûÂÊÎÔÛ",
+    tilde = "ãõÃÕñÑ",
+    umlaut = "äëïöüÄËÏÖÜÿ",
+    cedil = "çÇ"
+  )
+  
+  nudeSymbols <- c(
+    acute = "aeiouAEIOUyY",
+    grave = "aeiouAEIOU",
+    circunflex = "aeiouAEIOU",
+    tilde = "aoAOnN",
+    umlaut = "aeiouAEIOUy",
+    cedil = "cC"
+  )
+  
+  accentTypes <- c("´","`","^","~","¨","ç")
+  
+  if(any(c("all","al","a","todos","t","to","tod","todo")%in%pattern)) # opcao retirar todos
+    return(chartr(paste(symbols, collapse=""), paste(nudeSymbols, collapse=""), str))
+  
+  for(i in which(accentTypes%in%pattern))
+    str <- chartr(symbols[i],nudeSymbols[i], str)
+  
+  return(str)
+}
+
+#AVM_Simples2<- read_excel("C:/Users/Admin/Ermida/Ícaro Costa - Quadra Urbana/03 - Clientes [Projetos]/WIZ/Formulário AVM - Simples-analise (NOVO).xlsx")
+AVM_Simples2<- read_excel("C:/Users/jgararuna/Downloads/Formulário AVM - Simples-analise (NOVO).xlsx")
+
+ibge_qu <- read_excel("C:/Users/jgararuna/Downloads/ibge - qu.xlsx")
+ibge_qu$CIDADE = str_to_lower(rm_accent(ibge_qu$`NOME DO MUNICÍPIO`))
+AVM_Simples2 <- AVM_Simples2 %>% distinct(`# ID Processo - Interno`, .keep_all = TRUE)
+
+AVM_Simples3<-AVM_Simples2 %>% left_join(ibge_qu,by="CIDADE")
+AVM_Simples3$Cidade
+AVM_Simples4<- AVM_Simples3 %>% filter(is.na(POP)==F)
+
+AVM_tab<- AVM_Simples4 %>% select(FINALIDADE,TIPO_IMOVEL,`NOME DO MUNICÍPIO`,UF,POP,`PIB - 2018`)
+
+AVM_tab$SCORE=0
+
+AVM_tab$SCORE<- ifelse(AVM_tab$FINALIDADE=="Residencial",AVM_tab$SCORE+(1.33333*2.5),AVM_tab$SCORE+(1.33333*1.75))
+
+AVM_tab$SCORE<- ifelse(AVM_tab$TIPO_IMOVEL=="Apartamento",AVM_tab$SCORE+(1.33333*2.5),ifelse(
+  AVM_tab$TIPO_IMOVEL=="Casa condomínio",AVM_tab$SCORE+(1.33333*2.2),ifelse(
+    AVM_tab$TIPO_IMOVEL=="Casa fora condomínio",AVM_tab$SCORE+(1.33333*2.2),ifelse(
+      AVM_tab$TIPO_IMOVEL=="Loja",AVM_tab$SCORE +(1.33333*2),ifelse(
+        AVM_tab$TIPO_IMOVEL=="Outros",AVM_tab$SCORE+(1.33333*1.25),ifelse(
+          AVM_tab$TIPO_IMOVEL=="Sala",AVM_tab$SCORE+(1.33333*1.9),ifelse(
+            AVM_tab$TIPO_IMOVEL=="Terreno",AVM_tab$SCORE+(1.33333*1.5),ifelse(
+              AVM_tab$TIPO_IMOVEL=="Terreno condomínio",AVM_tab$SCORE+(1.33333*2),ifelse(
+                AVM_tab$TIPO_IMOVEL=="Terreno fora condomínio",AVM_tab$SCORE+(1.33333*1.7),AVM_tab$SCORE)))))))))
+
+AVM_tab$SCORE<- ifelse(AVM_tab$POP<= 5000,AVM_tab$SCORE+(1.33333*0.5),ifelse(
+  AVM_tab$POP> 5000 & AVM_tab$POP<=100000 ,AVM_tab$SCORE+(1.33333*1),ifelse(
+    AVM_tab$POP> 100000 & AVM_tab$POP<=300000,AVM_tab$SCORE+(1.33333*1.5),ifelse(
+      AVM_tab$POP> 300000 & AVM_tab$POP<=1000000,AVM_tab$SCORE+(1.33333*2),ifelse(
+        AVM_tab$POP> 1000000,AVM_tab$SCORE+(1.33333*2.5),AVM_tab$SCORE)))))
+
+B0<-330
+B1<- 18
+AVM_tab$Tempo<- B0 - B1*(AVM_tab$SCORE)
+AVM_tab$Tempo_h<- AVM_tab$Tempo/60
+
+
+AVM_tab$PORTE<- ifelse(AVM_tab$POP<= 5000,"Vila",ifelse(
+  AVM_tab$POP> 5000 & AVM_tab$POP<=100000 ,"Pequena",ifelse(
+    AVM_tab$POP> 100000 & AVM_tab$POP<=300000,"Média",ifelse(
+      AVM_tab$POP> 300000 & AVM_tab$POP<=1000000,"Grande",ifelse(
+        AVM_tab$POP> 1000000,"Metrópole",AVM_tab$POP)))))
+```
+
+#### Analisando os imóveis colocados no questionário "Formulário AVM - Simples", obtvemos as seguintes frequências:
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+d <- data.frame(table(AVM_tab$PORTE))
+v <- c("Total", nrow(AVM_tab))
+d[nrow(d)+1,] <- v
+d$Var1 <- ifelse(is.na(d$Var1), "Total",d$Var1)
+names(d) <- c("Porte", "Frequência")
+knitr::kable(d)
+
+d <- data.frame(table(AVM_tab$TIPO_IMOVEL))
+v <- c("Total", nrow(AVM_tab))
+d[nrow(d)+1,] <- v
+d$Var1 <- ifelse(is.na(d$Var1), "Total",d$Var1)
+names(d) <- c("Tipo do Imóvel", "Frequência")
+knitr::kable(d)
+
+d <- data.frame(table(AVM_tab$FINALIDADE))
+v <- c("Total", nrow(AVM_tab))
+d[nrow(d)+1,] <- v
+d$Var1 <- ifelse(is.na(d$Var1), "Total",d$Var1)
+names(d) <- c("Finalidade", "Frequência")
+knitr::kable(d)
+```
+
+#### Visando estimar o tempo de execução dos AVM's de variados imóveis colocados no questionário de "Formulário AVM - Simples", criamos um score, de 0 a 10, no intuito de quantificar a dificuldade que cada um deles apresenta para ser avaliado, tendo como referência a sua localização e o seu tipo. Dessa forma, estimamos um tempo para cada score. Feito isso, realizamos as seguintes análises:
+
+## Análise do Tempo em geral
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+#Analise do tempo geral:
+par(mfrow = c(1,2))
+hist(AVM_tab$Tempo_h, main = "Histograma dos Tempos", xlab = "Tempo", ylab = "Frequência", col = 1, border = "white")
+boxplot(AVM_tab$Tempo_h, main = "Boxplot dos Tempos", xlab = "Tempo", ylab = "Frequência", color = "white", border = "black")
+a <- as.vector(names(summary(AVM_tab$Tempo_h)))
+b <- as.vector(summary(AVM_tab$Tempo_h))
+medidas <- data.frame(Medida=a,Valor=round(b,1))
+knitr::kable(medidas)
+```
+
+
+
+
+## Análise do Score em geral
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+#Analise do Score geral:
+par(mfrow=c(1,2))
+hist(AVM_tab$SCORE, main = "Histograma doS Scores", xlab = "Score", ylab = "Frequência", col = 1, border = "white")
+boxplot(AVM_tab$SCORE, main = "Boxplot dos Scores", xlab = "Score", ylab = "Frequência", color = "white", border = "black")
+a <- as.vector(names(summary(AVM_tab$SCORE)))
+b <- as.vector(summary(AVM_tab$SCORE))
+medidas <- data.frame(Medida=a,Valor=round(b,1))
+knitr::kable(medidas)
+```
+
+
+## Analise dos Imóveis Residencias
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+#Analise do tempo e do score dos imoveis Residencias:
+par(mfrow=c(1,2))
+dados_res <- AVM_tab %>% filter(AVM_tab$FINALIDADE == "Residencial")
+hist(dados_res$Tempo_h, main = "Histograma dos Tempos", xlab = "Tempo", ylab = "Frequência", col = 1, border = "white")
+boxplot(dados_res$Tempo_h, main = "Boxplot dos Tempos", xlab = "Tempo", ylab = "Frequência", color = "white", border = "black")
+a <- as.vector(names(summary(dados_res$Tempo_h)))
+b <- as.vector(summary(dados_res$Tempo_h))
+medidas <- data.frame(Medida=a,Valor=round(b,1))
+knitr::kable(medidas)
+
+par(mfrow=c(1,2))
+hist(dados_res$SCORE, main = "Histograma dos Scores", xlab = "Score", ylab = "Frequência", col = 1, border = "white")
+boxplot(dados_res$SCORE, main = "Boxplot dos Scores", xlab = "Score", ylab = "Frequência", color = "white", border = "black")
+a <- as.vector(names(summary(dados_res$SCORE)))
+b <- as.vector(summary(dados_res$SCORE))
+medidas <- data.frame(Medida=a,Valor=round(b,1))
+knitr::kable(medidas)
+```
+
+
+## Análise dos Imóveis Comerciais
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+#Analise do tempo e do score dos imoveis Comerciais:
+par(mfrow=c(1,2))
+dados_com <- AVM_tab %>% filter(AVM_tab$FINALIDADE == "Comercial")
+hist(dados_com$Tempo_h, main = "Histograma dos Tempos", xlab = "Tempo", ylab = "Frequência", col = 1, border = "white")
+boxplot(dados_com$Tempo_h, main = "Boxplot dos Tempos", xlab = "Tempo", ylab = "Frequência", color = "White", border = "black")
+a <- as.vector(names(summary(dados_com$Tempo_h)))
+b <- as.vector(summary(dados_com$Tempo_h))
+medidas <- data.frame(Medida=a,Valor=round(b,1))
+knitr::kable(medidas)
+
+par(mfrow=c(1,2))
+hist(dados_com$SCORE, main = "Histograma dos Scores", xlab = "Score", ylab = "Frequência", col = 1, border = "white")
+boxplot(dados_com$SCORE, main = "Boxplot dos Scores", xlab = "Score", ylab = "Frequência", color = "White", border = "black")
+a <- as.vector(names(summary(dados_com$SCORE)))
+b <- as.vector(summary(dados_com$SCORE))
+medidas <- data.frame(Medida=a,Valor=round(b,1))
+knitr::kable(medidas)
+```
+
+
+## Análise das Vilas
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+dados_vila <- AVM_tab %>% filter(AVM_tab$PORTE == "Vila")
+par(mfrow=c(1,2))
+hist(dados_vila$Tempo_h, main = "Histograma dos Tempos", xlab = "Tempo", ylab = "Frequência", col = 1, border = "white")
+boxplot(dados_vila$Tempo_h, main = "Boxplot dos Tempos", xlab = "Tempo", ylab = "Frequência", color = "White", border = "black")
+a <- as.vector(names(summary(dados_vila$Tempo_h)))
+b <- as.vector(summary(dados_vila$Tempo_h))
+medidas <- data.frame(Medida=a,Valor=b)
+knitr::kable(medidas)
+
+par(mfrow=c(1,2))
+hist(dados_vila$SCORE, main = "Histograma dos Scores", xlab = "Score", ylab = "Frequência", col = 1, border = "white")
+boxplot(dados_vila$SCORE, main = "Boxplot dos Scores", xlab = "Score", ylab = "Frequência", color = "White", border = "black")
+a <- as.vector(names(summary(dados_vila$SCORE)))
+b <- as.vector(summary(dados_vila$SCORE))
+medidas <- data.frame(Medida=a,Valor=round(b,1))
+knitr::kable(medidas)
+```
+
+
+## Análise das Cidades pequenas
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+dados_pequena <- AVM_tab %>% filter(AVM_tab$PORTE == "Pequena")
+par(mfrow=c(1,2))
+hist(dados_pequena$Tempo_h, main = "Histograma dos Tempos", xlab = "Tempo", ylab = "Frequência", col = 1, border = "white")
+boxplot(dados_pequena$Tempo_h, main = "Boxplot dos Tempos", xlab = "Tempo", ylab = "Frequência", color = "white", border = "black")
+a <- as.vector(names(summary(dados_pequena$Tempo_h)))
+b <- as.vector(summary(dados_pequena$Tempo_h))
+medidas <- data.frame(Medida=a,Valor=b)
+knitr::kable(medidas)
+
+par(mfrow=c(1,2))
+hist(dados_pequena$SCORE, main = "Histograma dos Scores", xlab = "Score", ylab = "Frequência", col = 1, border = "white")
+boxplot(dados_pequena$SCORE, main = "Boxplot dos Scores", xlab = "Score", ylab = "Frequência", color = "white", border = "black")
+a <- as.vector(names(summary(dados_pequena$SCORE)))
+b <- as.vector(summary(dados_pequena$SCORE))
+medidas <- data.frame(Medida=a,Valor=round(b,1))
+knitr::kable(medidas)
+```
+
+
+## Análise das Cidades Médias
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+dados_media <- AVM_tab %>% filter(AVM_tab$PORTE == "Média")
+par(mfrow=c(1,2))
+hist(dados_media$Tempo_h, main = "Histograma dos Tempos", xlab = "Tempo", ylab = "Frequência", col = 1, border = "white")
+boxplot(dados_media$Tempo_h, main = "Boxplot dos Tempos", xlab = "Tempo", ylab = "Frequência", color = "white", border = "black")
+a <- as.vector(names(summary(dados_media$Tempo_h)))
+b <- as.vector(summary(dados_media$Tempo_h))
+medidas <- data.frame(Medida=a,Valor=round(b,1))
+knitr::kable(medidas)
+
+par(mfrow=c(1,2))
+hist(dados_media$SCORE, main = "Histograma dos Scores", xlab = "Score", ylab = "Frequência", col = 1, border = "white")
+boxplot(dados_media$SCORE, main = "Boxplot dos Scores", xlab = "Score", ylab = "Frequência", color = "white", border = "black")
+a <- as.vector(names(summary(dados_media$SCORE)))
+b <- as.vector(summary(dados_media$SCORE))
+medidas <- data.frame(Medida=a,Valor=round(b,1))
+knitr::kable(medidas)
+```
+
+
+## Análise das Cidades Grandes
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+dados_grande <- AVM_tab %>% filter(AVM_tab$PORTE == "Grande")
+par(mfrow=c(1,2))
+hist(dados_grande$Tempo_h, main = "Histograma dos Tempos", xlab = "Tempo", ylab = "Frequência", col = 1, border = "white")
+boxplot(dados_grande$Tempo_h, main = "Boxplot dos Tempos", xlab = "Tempo", ylab = "Frequência", color = "white", border = "black")
+a <- as.vector(names(summary(dados_grande$Tempo_h)))
+b <- as.vector(summary(dados_grande$Tempo_h))
+medidas <- data.frame(Medida=a,Valor=round(b,1))
+knitr::kable(medidas)
+
+par(mfrow=c(1,2))
+hist(dados_grande$SCORE, main = "Histograma dos Scores", xlab = "Score", ylab = "Frequência", col = 1, border = "white")
+boxplot(dados_grande$SCORE, main = "Boxplot dos Scores", xlab = "Score", ylab = "Frequência", color = "white", border = "black")
+a <- as.vector(names(summary(dados_grande$SCORE)))
+b <- as.vector(summary(dados_grande$SCORE))
+medidas <- data.frame(Medida=a,Valor=round(b,1))
+knitr::kable(medidas)
+```
+
+
+## Análise das Metrópoles
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+dados_met <- AVM_tab %>% filter(AVM_tab$PORTE == "Metrópole")
+par(mfrow=c(1,2))
+hist(dados_met$Tempo_h, main = "Histograma dos Tempos", xlab = "Tempo", ylab = "Frequência", col = 1, border = "white")
+boxplot(dados_met$Tempo_h, main = "Boxplot dos Tempos", xlab = "Tempo", ylab = "Frequência", color = "white", border = "black")
+a <- as.vector(names(summary(dados_met$Tempo_h)))
+b <- as.vector(summary(dados_met$Tempo_h))
+medidas <- data.frame(Medida=a,Valor=round(b,1))
+knitr::kable(medidas)
+
+par(mfrow=c(1,2))
+hist(dados_met$SCORE, main = "Histograma dos Scores", xlab = "Score", ylab = "Frequência", col = 1, border = "white")
+boxplot(dados_met$SCORE, main = "Boxplot dos Scores", xlab = "Score", ylab = "Frequência", color = "white", border = "black")
+a <- as.vector(names(summary(dados_met$SCORE)))
+b <- as.vector(summary(dados_met$SCORE))
+medidas <- data.frame(Medida=a,Valor=round(b,1))
+knitr::kable(medidas)
+```

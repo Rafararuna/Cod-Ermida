@@ -1,0 +1,242 @@
+---
+title: ""
+author: ""
+date: ""
+output: pdf_document
+---
+
+```{r pressure, echo=FALSE, fig.cap="", out.width = '20%', fig.align="right"}
+knitr::include_graphics("quadra_urbana.jpeg")
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(readxl)
+
+base_pages= read_excel("C:/Users/jgararuna/Downloads/Base RESALE cards and pages EDIT.xlsx")
+
+str(base_pages)
+
+base_pages$COMPLEMENTO = str_to_lower(base_pages$COMPLEMENTO)
+
+AREA_CARD = str_extract(base_pages$COMPLEMENTO,".......( m² de área privativa| m² de área construída| m² de área total)")
+AREA_CARD = str_replace(AREA_CARD,"( m² de área privativa| m² de área construída| m² de área total)","")
+AREA_CARD = str_replace_all(AREA_CARD,"(a|b|c|d|e|f|g|h|i|j|k|l|m|n|o|p|q|r|s|t|u|v|w|x|y|z|\\, |\\. |\\+|\\-)","")
+AREA_CARD = str_replace(AREA_CARD,"\\,","\\.")
+base_pages$AREA_CARD = as.numeric(AREA_CARD)
+
+AREA_TERR_CARD = str_extract(base_pages$COMPLEMENTO,"............ de área de terreno")
+AREA_TERR_CARD = str_replace(AREA_TERR_CARD," de área de terreno","")
+AREA_TERR_CARD = str_replace_all(AREA_TERR_CARD,"(a|b|c|d|e|f|g|i|j|k|l|n|o|p|q|r|s|t|u|v|w|x|y|z|\\, |\\. |\\+|\\-|\\(|\\)|\\²)","")
+AREA_TERR_CARD = str_replace_all(AREA_TERR_CARD,"\\,","\\.")
+AREA_TERR_CARD =str_trim(AREA_TERR_CARD)
+AREA_TERR_CARD= str_split(AREA_TERR_CARD," ",simplify = T)
+AREA_TERR_CARD[,1]= str_replace_all(AREA_TERR_CARD[,1],"(h|m)","")
+AREA_TERR_CARD = data.frame(AREA_TERR_CARD)
+AREA_TERR_CARD_NUM = as.numeric(AREA_TERR_CARD[,1])
+MEDIDA= AREA_TERR_CARD[,2]
+AREA_TERR_CARD= ifelse(MEDIDA == "h",AREA_TERR_CARD_NUM*10000,AREA_TERR_CARD_NUM)
+base_pages$AREA_TERR_CARD=AREA_TERR_CARD
+
+base_pages$TAGS_BAIXO = str_to_lower(base_pages$TAGS_BAIXO)
+base_pages$TAGS_BAIXO = str_replace_all(base_pages$TAGS_BAIXO,"\r\n"," ")
+
+
+QUARTO_CARD = str_extract(base_pages$TAGS_BAIXO,"..dormitório")
+QUARTO_CARD = str_replace(QUARTO_CARD," dormitório","")
+base_pages$QUARTO_CARD = as.numeric(QUARTO_CARD)
+
+SUITE_CARD = str_extract(base_pages$TAGS_BAIXO,"...suíte")
+SUITE_CARD = str_replace_all(SUITE_CARD,"(suíte| )","")
+base_pages$SUITE_CARD = as.numeric(SUITE_CARD)
+
+VAGA_CARD=str_extract(base_pages$TAGS_BAIXO,"...vaga")
+VAGA_CARD = str_replace_all(VAGA_CARD,"(vaga| )","")
+base_pages$VAGA_CARD = as.numeric(VAGA_CARD)
+
+base_pages$CARACTERISTICAS = str_to_lower(base_pages$CARACTERISTICAS)
+base_pages$CARACTERISTICAS = str_replace_all(base_pages$CARACTERISTICAS,"\r\n"," ")
+
+AREA_PAGE = str_extract(base_pages$CARACTERISTICAS,"(área privativa|área construida|área total) .*")
+AREA_PAGE = str_replace(AREA_PAGE,"(área privativa|área construida|área total)","")
+AREA_PAGE = str_split(AREA_PAGE,"(m²|ha)",simplify = T)[,1]
+AREA_PAGE =str_replace(AREA_PAGE,"\\.","")
+AREA_PAGE =str_replace_all(AREA_PAGE,",",".")
+base_pages$AREA_PAGE = as.numeric(AREA_PAGE)
+
+
+QUARTO_PAGE = str_extract(base_pages$CARACTERISTICAS,"dormitório\\(s\\) .*")
+QUARTO_PAGE = str_replace(QUARTO_PAGE,"dormitório\\(s\\) ","")
+QUARTO_PAGE = str_split(QUARTO_PAGE," ",simplify = T)[,1]
+QUARTO_PAGE =str_replace(QUARTO_PAGE,"\\.","")
+QUARTO_PAGE =str_replace_all(QUARTO_PAGE,",",".")
+base_pages$QUARTO_PAGE = as.numeric(QUARTO_PAGE)
+
+SUITE_PAGE = str_extract(base_pages$CARACTERISTICAS,"suíte\\(s\\) .*")
+SUITE_PAGE = str_replace(SUITE_PAGE,"suíte\\(s\\) ","")
+SUITE_PAGE = str_split(SUITE_PAGE," ",simplify = T)[,1]
+SUITE_PAGE = str_replace(SUITE_PAGE,"\\.","")
+SUITE_PAGE = str_replace_all(SUITE_PAGE,",",".")
+base_pages$SUITE_PAGE = as.numeric(SUITE_PAGE)
+
+VAGA_PAGE = str_extract(base_pages$CARACTERISTICAS,"garagem .*")
+VAGA_PAGE = str_replace(VAGA_PAGE,"garagem ","")
+VAGA_PAGE = str_split(VAGA_PAGE," ",simplify = T)[,1]
+VAGA_PAGE = str_replace(VAGA_PAGE,"\\.","")
+VAGA_PAGE = str_replace_all(VAGA_PAGE,",",".")
+base_pages$VAGA_PAGE = as.numeric(VAGA_PAGE)
+
+#table(VAGA_CARD)
+
+DATA_LEILAO = str_split(base_pages$LEILAO_DATE," - ", simplify = T)[,1]
+DATA_LEILAO = str_replace(DATA_LEILAO,"Data do Leilão ","")
+base_pages$DATA_LEILAO = DATA_LEILAO
+
+HORA_LEILAO = str_split(base_pages$LEILAO_DATE," - ", simplify = T)[,2]
+HORA_LEILAO = str_replace(HORA_LEILAO,"Horário:  ","")
+base_pages$HORA_LEILAO=HORA_LEILAO
+
+#LINK_BANK => nome do anunciante
+
+base_pages$ANUNCIANTE = ifelse(base_pages$LINK_BANK=="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGkAAAAkCAMAAAC9muS6AAAAe1BMVEUAAAD////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////NgkbwAAAAKHRSTlMAz1CResBeZ9mbSEAb6i8ggAWwNCfxchMK4ar3oLUPuqWKOmzJVsWEn+mbCwAAA7JJREFUSMftlOvSkzAURXdIQiCEci1QKOXWS97/CT0J/dSq4+hYfzjjmmmB0LAOO6fBf/4EM8dxg2/gLZ50Cu9iboEM9ZK3CEVTQAhAXTUOWwjFNTQCHuIdnEF0ZVvPYNlNmfhQiKBY1vDR0VGD67wIFd5AD6JugJikbY6wN7EbCBMaIbgw7t4bULmpHkVZr850ybUOQ0VvVpGpUSYET7hp3hNfJdQFplEdNIq1UKpAICrUBv6YYBUa//kxku2MeKVmTOGtHO3OCa8crM3xh3TPQ/dh4g7xdtN6t9x5xHFYnybs8PKhZRRfkinqa2d6LJG8AbeyTNiG9XyNpOgAJHPEuAFgOIv6BGjLUm+MLcXX6ZcUVAqEKR3Fq4nZ00Cj0n2dCjKllgiQWxvZPKRzujMByjrSGlnqhxQya5klHvigjS1xVNqPj+1u8pwBGlxCmtnfImszZ8oOg2XI3ZztZFnb0U/abLDH4DbYHlR1VUg7GDLZrbH2jifaFxlraQmmRXq/vJqOwGitwWJtTaYYmKztyHTv0NVZttLMrLEu/scUd64MbCTJ/LumdLkTWKJMZt9poXLa1ZsCovLpwdVZONOBTBw4k5NMoctjrymjXBo4akraP5VnvtLThyk7Ut6J96VNEFmiL17XaTcB/LNp3k2Juzs8qn43CdIcjKF39ablG1NPohaAHJbE53fVeSSc6eL53tT75xfeVPlLl56iFUYR2Qip6y1h7e3V1A60fiDqhJxkvfn8vvxzvzfZnE5mfJhOiXDpXWjalSIRTsKpiaPi1RS4VD2xy2+7+fz4T0zz5AoyuwnuInVhYvWNNRcozr7kGq8mQXnCY4bhoe+WuK+ADnY0EvqgCgLgEASXS2C6UIQdUAdBCxQ3odrMn3Y30VRwVI0IChrwHaWDBI78y+4SPPMLtwR/AeUif3Ly/ScouAzvh1b42GEnpI71/TAY/AUit/5P8tD3A1vxN3Bb5HO3reS+T+D3EL86oXdd0KxVOFq/TruVjWYeD2xs+aTjOr+WQDO2jynIgzg3PbiurhzoDzF42PZjBn2N1aR4tVTgl1DxOu43JmRZTwo7RWk/MywX7KRsW5I4Zcl4u9+r83EGNlnJjp0jdp4iw8aEXYHrVV6YDEXwAMosv+oyShOUF+qrSDIwnMpWCnywpXbnbPDB1LaTXKf5cGZc3IOo7MDvVSzVksjFjGqWmo8d+mQOe7lKeQBi00gV621FPDZNk/QjRlxLLWN8prjxSZ43g//8Y3wCgmd3PHKR5XgAAAAASUVORK5CYII=",
+                               "EMBRACOM",ifelse(base_pages$LINK_BANK=="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGkAAAAkCAMAAAC9muS6AAAAq1BMVEUAAAD////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////Nr6iZAAAAOHRSTlMAz8EgDwLhy7GAURMLxZDxBS8kiXigXxpDNAiVjW9Z0WYqF7iESv3d2tdiTj86972Zc+WqneylRx0aIBgAAAL/SURBVEjHtZZrc6IwGIVPEgJyFQUFwYL3a73Wtvn/v2wTqKO7Qnd3is8XZzIOz5w3JwFU4M+H1DBoTmgQczyPKMiHsQOFvU1Xpo3n4Icku8+RbMjLU3IxN/TxO8nsEKFxBmSAR15JBw3TMRiq6JIuGiUiDNWMSaO94IdX1DFvoUFGAeo5ZmgMhzioxyY+muLl5Topc4ZH+s31z7hG0gW5y/Lj1jkPR6mHCtNS/EcVOCrQCP4gtKpM7f8wzb1/M7Umd6Z42Es3TmEyLMuKgIF56QXbb1th/aPJxc20EAqdKZNiAE8UGDYk0XGt0wzgU0rfNhywzRalA+tMKdXCojmzLkJKp7PJX0zifPRcIabKtNf1ZWJJbxrIpQsAPx85GLt9cMa6u7cATh6OGfOtC2MMvddiQh1MGOu8rJJHE70z7SMAByG06z69ib0ariHaHJh/AJAqFCQ6+t5tejdTwcfn96a8qIic2tVExAqSVAgbCMuDdwZ2QWoOdAytKtPklA6zoP/99ArrSIjXq2lV1tEUggFmv6wlMiOLM7pAL64w2avT53a4/9a0FkZxZwixu2VaQuKVpg0U76BjAE4b6fbeFJemTQDJpcLUivAFFe+8fGxXmtxynxYM8I3SNITEXoPYxQgQhlDMi7M/LBLTbnm5zSpMpwxfzIQIInveFmfVgYVpWdpWiPfW20qUpvYA4KmJDxVubIAtVTj546hkLQ50l/xz6gMJ7TyaOh/4YvIuSkZqsyQLB0FxxPZfmVxC9WMCZqypkUvtJ1lTusPpbBx8ftSn7jIGPN119RAaqb9h0W3t5eNJETJryVOq1kZmGB9l94pGaMyHwmYTFDiaxgGuaQC0MeNF/5n6F4/q3hoFfBIleMBfy/OkTE99Ezqm15P7lKr6b/FDZC/r6QnFQUMjTGPUYbmeNzzt0BCT2s+6gaGhUTo1qrFab1pVNaA476JxImomf7bOm9p4Av6J9H3cSEZkxPEc7Fmezu0y4faShxqeB4+Dg+ESw5jOds3l+QVi30ohElbmfgAAAABJRU5ErkJggg==",
+                                                 "BTG",ifelse(base_pages$LINK_BANK=="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGkAAAAkCAMAAAC9muS6AAAAwFBMVEUAAAD////////////////s7Oz///////////////////////////////+oqKj////////////////////////////////////////////Ozs7///////////////////////////////+np6eoqKj///////////+oqKj///+vr6+np6f+/v6np6f////////j4+Ovr6+np6f///////+np6enp6enp6fLy8vS0tL///+mpqa8vLz39/fu7u7Ozs6+93uJAAAAOnRSTlMAeqX7EQTz7cysC9+YYV1YRSXYoot2FwnFaU1LOh7p5J2Gg3pyb1E1LCoR27+3lDD+/fW4QOKXhmY/PxQqUwAAAeRJREFUSMft1Nt2mlAQBuAfARE8gSgmVaKmnhM1p562afv+b9X9zwTtJaze9IJvrQRmg4yzZxC1Wq32n/H74WDWWuQajRrWCiLmee6lPKyBbY+2vDKWtSkqSVpG3Gvk8nwAseB5hDkPd9H+y9l62PPKytACVewCo25Bcw08UMgMQNbk0vDARC9a0szQIyqI2oZc10wY5q4RbyBWe8MdlVuemakHujUiQAX3slmxP3ZODI9GjUCsJWUJ8nWebKJv2lnGlKC8gb2/7RVRxpJC/klkLIdna0Pv54MP6vJDLLiP0nLtUGFoo9aaz2E0NZeHPfL0l04DfH49J2XvUFrXWJdh9bhd3Z2MRHFxI8/+RD+g+uxa5kgTS2NrOQvXqW5GY25hrD3UlPh6pqfTdcdDydf0q9UUSj0fJblBULSnUYxXTxL91hK0ac1ARn9X/m0yFMbxcQg4RhXZW+yaPW5fmOhdm8blqy5Ku3xshCgwVzN7jXED2D8w0fNPrkbAxPzliNKmrlF9fT/TTqcjg5bB+/iNOpzpu2t02G74w9Gx2tVGArFW4m7Gd/bwKtl1TDa6PUtJtMRcbkveLu/FsMpIULSav6arDIljJbLCs40u5P7ys7UEPIfiif03kuefGHuo1Wq1f/IHjCpvOCu2sbUAAAAASUVORK5CYII=",
+                                                              "CAIXA",ifelse(base_pages$LINK_BANK=="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGkAAAAlCAMAAAB2xjcfAAAAgVBMVEUAAAD///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////9d3yJTAAAAKnRSTlMA9uQ6FOtxCCaRZ0oxqXg28M9hGg7asEDFH7V9vqBVToqDLtW5mWsDW8lxHmEEAAACtklEQVRIx+2TWa6bQBAAu2cHhn3fjbGx3fc/YBjHsRIlUn6MFCmvxAcDiFI1DHzxxb9DPhXwphVwGEFXjha+c5uGGA5C9CsSPnz9DDqVxOEY5gbJkXR7y71EOsgkTpJIRj4jQqb0zAhPBRxA4IKGWmsbuqzKGm9+io4IImY1wE08s0q/0PB5ghTJkU4adBYbl4XdGT5N4SG96LSpUKpnFsntdpQpiUTmFKG2qxtm9mkT6CB1omYf2+6UfqGcrzq7D2XCsLpy+Auvp/7OLfcIe3Ev3QCNqZxv0+Dg9Fiw1IU/gfADmKyIThzsspz3tfJbMFF/Bk7pkqzx8wL3DfBN2XOW72e/w20ekgvSm3RBBuBlusIq9UwoOElRnsJypFpWF7mvu3Q1bOikiGmEB4soZI1uyNvFJ95jTT78gclN7GLazvkygLcpYaRgXHG2RNvDY16xZcQDii0FASkKONWWkpKyO5krMzJN7xTeoE9qyuA3nkGJ0ncX1LXmcip+mAafPXKm0tEm3VpemQdQE98PS1NNCwUxBZYanzWKPBlkLKN4Sco6cqY/BzVn8RqgSojS+j29CylKZRkkc0KuaVE/muZ30wgVeZRJHmJDCvK0PMma7vArZnSC7784VsYO5EAvdyZkAw4jsxsu2I7YV6mHAQsrJmKsHo1hVSjzGFmHg0J7XZPTuSn7vhyWpMYwEvAToqGdUce7iCmhJH0HRw2Qqyi6i2mCQs1bYVTcLtcAuOfF7pafQ+x5/PWUUaKNVAt11Pd+G2+tin413fgFn/vnfOnOYFakd9PH0ZHrYFlxc4ne05POcABax4MrCY2Gm1boggR8Hm2u6SQi5rJ8wS+7pwngCGxKhBnwS+L27i6UXg6H4Lt3twBFz2gHHzMcRIbN6918wMOCHEEv4EWhwgCOQ/+6+OL/5RvlDE4Ylc1T8QAAAABJRU5ErkJggg==",
+                                                                             "BB",ifelse(base_pages$LINK_BANK=="data:image/png;base64,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",
+                                                                                         "EMGEA","OUTROS")))))
+
+#TAGS_CIMA => ID,OCUPACAO,TIPO_VENDA
+
+base_pages$ID <- str_split(base_pages$TAGS_CIMA,"\r\n",simplify = T)[,1]
+base_pages$OCUPACAO <- str_split(base_pages$TAGS_CIMA,"\r\n",simplify = T)[,2]
+base_pages$TIPO_VENDA <- str_split(base_pages$TAGS_CIMA,"\r\n",simplify = T)[,3]
+
+#TITULO => TIPO_IMOVEL
+base_pages$TITULO= str_replace_all(base_pages$TITULO,"\\.","")
+base_pages$TITULO=str_trim(base_pages$TITULO)
+base_pages$TIPO_IMOVEL <- str_split(base_pages$TITULO, "(,|\\/| )", simplify = T)[,1]
+#table(base_pages$TIPO_IMOVEL)
+
+#CIDADE_EST => CIDADE, ESTADO
+
+base_pages$CIDADE <- str_split(base_pages$CIDADE_EST, "/", simplify = T)[,1]
+base_pages$ESTADO <- str_split(base_pages$CIDADE_EST, "/", simplify = T)[,2]
+```
+
+
+**Análises Resale**
+
+- O Imóvel foi avaliado?
+
+```{r, echo=FALSE}
+df <- data.frame("O Imóvel foi Avaliado?" = c("SIM", "NÃO"),
+                 Quantidade = c((nrow(base_pages) - sum(is.na(base_pages$VALOR_AVL))), 
+                                sum(is.na(base_pages$VALOR_AVL))))
+colnames(df)[1] <- "O Imóvel foi Avaliado?"
+knitr::kable(df, align = 'c')
+```
+
+
+<center> - Estados atingidos pelo Resale
+
+```{r, echo=FALSE}
+df2 <- data.frame(table(base_pages$ESTADO))
+colnames(df2)[1] <- "Estado"
+colnames(df2)[2] <- "Quantidade"
+knitr::kable(df2)
+```
+
+
+- Anunciante por Deságio
+
+```{r, echo=FALSE}
+base_pages$ANUNCIANTE <- ifelse(is.na(base_pages$ANUNCIANTE), "OUTROS", base_pages$ANUNCIANTE)
+df3 <- data.frame(table(base_pages$ANUNCIANTE))
+base_pages2 <- base_pages %>% drop_na(DESAGIO)
+a <- base_pages2 %>% group_by(ANUNCIANTE) %>% summarise(mean(DESAGIO), na.rm=T)
+df3[,3] <- a[,2]
+names(df3) <- c("Anunciante", "Quantidade", "Média de Deságio")
+knitr::kable(df3)
+```
+
+- Situação do imóvel por Deságio
+
+```{r, echo=FALSE}
+df4 <- data.frame(table(base_pages$OCUPACAO))
+base_pages2 <- base_pages %>% drop_na(DESAGIO)
+b <- base_pages2 %>% group_by(OCUPACAO) %>% summarise(mean(DESAGIO), na.rm=T)
+df4[,3] <- b[,2]
+names(df4) <- c("Situação do Imóvel", "Quantidade", "Média de Deságio")
+knitr::kable(df4)
+```
+
+
+- Número de Cidades e Cidades em destaque
+
+```{r, echo=FALSE}
+print(length(unique(base_pages$CIDADE)))
+
+df5 <- data.frame(table(base_pages$CIDADE))
+names(df5) <- c("Destaque para as Cidades", "Quantidade")
+df6 <- df5 %>% arrange(desc(Quantidade)) %>% filter(Quantidade >= 50) #colocar a quantidade de habitantes por cidade
+knitr::kable(df6)
+```
+
+- Tipos de Venda por Deságio
+
+```{r, echo=FALSE}
+df7 <- data.frame(table(base_pages$TIPO_VENDA))
+base_pages2 <- base_pages %>% drop_na(DESAGIO)
+c <- base_pages2 %>% group_by(TIPO_VENDA) %>% summarise(mean(DESAGIO), na.rm=T)
+df7[,3] <- c[,2]
+names(df7) <- c("Tipos de Venda", "Quantidade", "Média de Deságio")
+
+base_pages3 <- base_pages %>% filter(is.na(DESAGIO))
+df8 <- data.frame(table(base_pages3$TIPO_VENDA))
+d <- base_pages3 %>% group_by(TIPO_VENDA) %>% summarise(mean(DESAGIO), na.rm=T)
+df8[,3] <- d[,2]
+names(df8) <- c("Tipos de Venda", "Quantidade", "Média de Deságio")
+knitr::kable(df8)
+```
+
+
+- Número de fotos do imóvel ou do mapa por Anunciante e por Deságio
+
+```{r, echo=FALSE}
+base_pages2 <- base_pages %>% drop_na(DESAGIO)
+base_pages2$STATIC <- ifelse(str_detect(base_pages2$LINK_FOTO, 'static'), "Sem foto","Foto do imóvel/mapa")
+base_pages2$REF <- 1
+df9 <- base_pages2 %>% group_by(ANUNCIANTE, STATIC) %>% summarise(sum(REF), mean(DESAGIO))
+names(df9) <- c("Anunciante", "Foto do Anúncio", "Quantidade", "Média de Deságio")
+knitr::kable(df9)
+```
+
+
+- Tipos de Venda por Anunciante e por Deságio
+
+```{r, echo=FALSE}
+base_pages2 <- base_pages %>% drop_na(DESAGIO)
+base_pages2$REF <- 1
+df10 <- base_pages2 %>% group_by(ANUNCIANTE, TIPO_VENDA) %>% summarise(sum(REF), mean(DESAGIO))
+names(df10) <- c("Anunciante", "Tipo de Venda", "Quantidade", "Média de Deságio")
+knitr::kable(df10)
+```
+
+
+- Areas Card x Page
+
+```{r, echo=FALSE}
+nrow(base_pages)-sum(is.na(base_pages$AREA_CARD))
+nrow(base_pages)-sum(is.na(base_pages$AREA_PAGE))
+
+base_pages$AREA_SITUACAO = ifelse(is.na(base_pages$AREA_CARD) & is.na(base_pages$AREA_PAGE),"Nunca possuiu",
+                                  ifelse(is.na(base_pages$AREA_CARD)==F & is.na(base_pages$AREA_PAGE),"perdeu",
+                                         ifelse(is.na(base_pages$AREA_CARD) & is.na(base_pages$AREA_PAGE)==F,"ganhou",
+                                                ifelse(is.na(base_pages$AREA_CARD)==F & is.na(base_pages$AREA_PAGE)==F,"Manteve",0))))
+
+df15 <- data.frame(table(base_pages$AREA_SITUACAO))
+knitr::kable(df15)
+```
+
+

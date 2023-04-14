@@ -1,0 +1,298 @@
+---
+title: "Analises de BSB"
+author: "Quadra Urbana"
+date: "23/08/2021"
+output: html_document
+---
+```{r inputs, echo=FALSE, message=FALSE, warning=FALSE}
+user= "Rafael"
+```
+
+
+```{r functions, echo=FALSE, message=FALSE, warning=FALSE}
+library(tidyverse)
+
+rm_accent <- function(str,pattern="all") {
+    # Rotinas e funções úteis V 1.0
+    # rm.accent - REMOVE ACENTOS DE PALAVRAS
+    # Função que tira todos os acentos e pontuações de um vetor de strings.
+    # Parâmetros:
+    # str - vetor de strings que terão seus acentos retirados.
+    # patterns - vetor de strings com um ou mais elementos indicando quais acentos deverão ser retirados.
+    #            Para indicar quais acentos deverão ser retirados, um vetor com os símbolos deverão ser passados.
+    #            Exemplo: pattern = c("´", "^") retirará os acentos agudos e circunflexos apenas.
+    #            Outras palavras aceitas: "all" (retira todos os acentos, que são "´", "`", "^", "~", "¨", "ç")
+    if(!is.character(str))
+      str <- as.character(str)
+    
+    pattern <- unique(pattern)
+    
+    if(any(pattern=="Ç"))
+      pattern[pattern=="Ç"] <- "ç"
+    
+    symbols <- c(
+      acute = "áéíóúÁÉÍÓÚýÝ",
+      grave = "àèìòùÀÈÌÒÙ",
+      circunflex = "âêîôûÂÊÎÔÛ",
+      tilde = "ãõÃÕñÑ",
+      umlaut = "äëïöüÄËÏÖÜÿ",
+      cedil = "çÇ"
+    )
+    
+    nudeSymbols <- c(
+      acute = "aeiouAEIOUyY",
+      grave = "aeiouAEIOU",
+      circunflex = "aeiouAEIOU",
+      tilde = "aoAOnN",
+      umlaut = "aeiouAEIOUy",
+      cedil = "cC"
+    )
+    
+    accentTypes <- c("´","`","^","~","¨","ç")
+    
+    if(any(c("all","al","a","todos","t","to","tod","todo")%in%pattern)) # opcao retirar todos
+      return(chartr(paste(symbols, collapse=""), paste(nudeSymbols, collapse=""), str))
+    
+    for(i in which(accentTypes%in%pattern))
+      str <- chartr(symbols[i],nudeSymbols[i], str)
+    
+    return(str)
+  }
+format_real <- function(values, nsmall = 0) {
+  values %>%
+    as.numeric() %>%
+    format(nsmall = nsmall, decimal.mark = ",", big.mark = ".") %>%
+    str_trim() %>%
+    str_c("R$ ", .)
+}
+format_dolar<- function(values, nsmall = 0) {
+  values %>%
+    as.numeric() %>%
+    format(nsmall = nsmall, decimal.mark = ",", big.mark = ".") %>%
+    str_trim() %>%
+    str_c("$ ", .)
+}
+format_pct<-function(values, nsmall = 0) {
+  values %>%
+    as.numeric() %>%
+    format(nsmall = nsmall, decimal.mark = ",", big.mark = ".") %>%
+    str_trim() %>%
+    str_c(.,"%")
+}
+format_quant<-function(values, nsmall = 0) {
+  values %>%
+    as.numeric() %>%
+    format(nsmall = nsmall, decimal.mark = ",", big.mark = ".") %>%
+    str_trim()
+}
+```
+
+
+```{r dados, include=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+
+if(user == "Pupe"){
+dados = read_csv("C:/Users/Admin/Ermida/Ícaro Costa - Quadra Urbana/04 - Desenvolvimento/Bases/banco_3mi.csv")}
+
+if(user == "Rafael"){
+dados = read_csv("C:/Users/jgararuna/Downloads/banco_3mi.csv")}
+
+dados = dados %>% distinct(LINK,.keep_all = T)
+
+dados=pivot_longer(dados,c("VALOR_VENDA","VALOR_ALUGUEL"),names_to = "TIPO_ANUNCIO",values_to = "VALOR",values_drop_na = TRUE)
+
+dados$TIPO_ANUNCIO= str_split(dados$TIPO_ANUNCIO,"_",simplify = T)[,2]
+sum(is.na(dados$TIPO_ANUNCIO))
+dados$DATA_ID= seq(1:nrow(dados))
+
+dados$AREA = dados$AREA_UTIL
+
+dados = dados %>% filter(AREA>=1)
+
+dados$VALOR_M2 = dados$VALOR/dados$AREA
+
+dados$VALOR_LN=log(dados$VALOR)
+dados$VALOR_M2_LN=log(dados$VALOR_M2)
+
+dados$QUARTO=ifelse(is.na(dados$QUARTOS),0,dados$QUARTOS)
+dados$BANHEIRO=ifelse(is.na(dados$BANHEIROS),0,dados$BANHEIROS)
+dados$SUITE=ifelse(is.na(dados$SUITES),0,dados$SUITES)
+dados$VAGA=ifelse(is.na(dados$VAGAS),0,dados$VAGAS)
+
+dados$REF = 1
+
+dados<- dados %>% select(c("DATA_ID","TIPO_IMOVEL","TIPO_ANUNCIO","RUA_OU_QUADRA","BAIRRO","CIDADE","ESTADO","AREA","AREA_TOTAL","QUARTO","BANHEIRO","SUITE","VAGA","VALOR","VALOR_M2","VALOR_LN","VALOR_M2_LN","PERIODICIDADE","DATA_CRIACAO","CEP","REF"))
+
+unique(dados$TIPO_IMOVEL)
+dados$TIPO_IMOVEL <- ifelse(dados$TIPO_IMOVEL=="ALLOTMENT_LAND", "TERRENO", 
+                            ifelse(dados$TIPO_IMOVEL=="BUILDING", "EDIFICIO",
+                                   ifelse(dados$TIPO_IMOVEL=="CONDOMINIUM", "CASA_CONDOMINIO",
+                                          ifelse(dados$TIPO_IMOVEL=="SHED_DEPOSIT_WAREHOUSE", "DEPOSITO",
+                                                 ifelse(dados$TIPO_IMOVEL=="COUNTRY_HOUSE", "CHACARA",
+                                                        ifelse(dados$TIPO_IMOVEL=="CLINIC", "CONSULTORIO",
+                                                               ifelse(dados$TIPO_IMOVEL=="COMMERCIAL_BUILDING", "EDIFICIO COMERCIAL",
+                                                                      ifelse(dados$TIPO_IMOVEL=="LOFT", "SOTAO",
+                                                                              ifelse(dados$TIPO_IMOVEL=="STORE", "LOJA",
+                                                                                     ifelse(dados$TIPO_IMOVEL=="HOME", "CASA",
+                                                                                            ifelse(dados$TIPO_IMOVEL=="FARM", "FAZENDA",
+                                                                                                   ifelse(dados$TIPO_IMOVEL=="COMMERCIAL_ALLOTMENT_LAND", "TERRENO COMERCIAL",
+                                                                                                          ifelse(dados$TIPO_IMOVEL=="OFFICE", "ESCRITORIO",
+                                                                                                                 ifelse(dados$TIPO_IMOVEL=="FLAT", "FLAT",
+                                                                                                                        ifelse(dados$TIPO_IMOVEL=="KITNET", "KITNET",
+                                                                                                                               ifelse(dados$TIPO_IMOVEL=="TWO_STORY_HOUSE", "CASA",
+                                                                                                                                      ifelse(dados$TIPO_IMOVEL=="VILLAGE_HOUSE", "CASA",
+                                                                                                                                             ifelse(dados$TIPO_IMOVEL=="APARTMENT", "APARTAMENTO",
+                                                                                                                                                    ifelse(dados$TIPO_IMOVEL=="RESIDENTIAL_ALLOTMENT_LAND", "TERRENO RESIDENCIAL",
+                                                                                                                                                           ifelse(dados$TIPO_IMOVEL=="COMMERCIAL_PROPERTY", "PROPRIEDADE COMERCIAL",
+                                                                                                                                                                  ifelse(dados$TIPO_IMOVEL=="BUSINESS", "EMPRESA",
+                                                                                                                                                                         ifelse(dados$TIPO_IMOVEL=="HOTEL", "HOTEL",
+                                                                                                                                                                                ifelse(dados$TIPO_IMOVEL=="PENTHOUSE", "COBERTURA",
+                                                                                                                                                                                       ifelse(dados$TIPO_IMOVEL=="RESIDENTIAL_BUILDING", "EDIFICIO RESIDENCIAL",
+                                                                                                                                                                                              ifelse(dados$TIPO_IMOVEL=="PARKING_SPACE","VAGA", dados$TIPO_IMOVEL)))))))))))))))))))))))))
+
+dados <- dados %>% filter(CIDADE=="Brasília") %>% filter(TIPO_IMOVEL=="CASA_CONDOMINIO"|TIPO_IMOVEL== "CASA"| TIPO_IMOVEL=="FLAT"| TIPO_IMOVEL=="KITNET"|TIPO_IMOVEL=="APARTAMENTO"|TIPO_IMOVEL=="TERRENO RESIDENCIAL"|TIPO_IMOVEL=="COBERTURA"|TIPO_IMOVEL=="EDIFICIO RESIDENCIAL"|TIPO_IMOVEL=="TERRENO")
+```
+
+## Análises de BSB
+
+# Levantamento do mercado de aluguel e venda residencial de Brasília. 
+# Preciso entender qual nível de detalhes vocês conseguem levantar com os dados disponíveis do scrapping, por exemplo:
+
+## a.	Preço médio por tipo de imóvel e por bairros.
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Rafael
+#df1 <- data.frame(table(dados$TIPO_IMOVEL))
+df1 <- dados %>% filter(TIPO_ANUNCIO=="VENDA")
+df1 <- df1 %>% group_by(TIPO_IMOVEL) %>% 
+  summarise(qt = sum(REF) , 
+            pct = round(100*(sum(REF)/nrow(df1)),2), 
+            media= mean(VALOR),
+            med=median(VALOR)) %>% arrange(desc(qt))
+
+df1$qt<-format_quant(df1$qt)
+df1$pct<-format_pct(df1$pct)
+df1$media<-format_real(df1$media)
+df1$med<-format_real(df1$med)
+
+names(df1) <- c("Tipo do Imóvel", "Quantidade", "(%)", "Média do Preço","Mediana do Preço")
+
+a <- knitr::kable(df1,align = "c")
+kable_styling(a, position = "center", font_size = 10, row_label_position = "c", bootstrap_options = "basic", fixed_thead = list(enabled = T/F, background = "black"), htmltable_class = 'lightable-material', html_font = "Montserrat")
+
+
+
+df1 <- dados %>% filter(TIPO_ANUNCIO=="VENDA")
+df1 <- df1 %>% group_by(BAIRRO) %>% 
+  summarise(qt = sum(REF) , 
+            pct = round(100*(sum(REF)/nrow(df1)),2), 
+            media= mean(VALOR),
+            med=median(VALOR)) %>% arrange(desc(qt))
+
+df2<-df1
+
+df1$qt<-format_quant(df1$qt)
+df1$pct<-format_pct(df1$pct)
+df1$media<-format_real(df1$media)
+df1$med<-format_real(df1$med)
+
+names(df1) <- c("Bairro", "Quantidade", "(%)","Mediana do Preço")
+
+knitr::kable(df1,align = "c")
+
+
+```
+
+## b.	Valor de aluguel médio por tipo de imóvel e por bairro;
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Rafael
+
+df1 <- dados %>% filter(TIPO_ANUNCIO=="ALUGUEL")
+df1 <- df1 %>% group_by(TIPO_IMOVEL) %>% 
+  summarise(qt = sum(REF) , 
+            pct = round(100*(sum(REF)/nrow(df1)),2), 
+            media= mean(VALOR),
+            med=median(VALOR)) %>% arrange(desc(qt))
+
+df1$qt<-format_quant(df1$qt)
+df1$pct<-format_pct(df1$pct)
+df1$media<-format_real(df1$media)
+df1$med<-format_real(df1$med)
+
+names(df1) <- c("Tipo do Imóvel", "Quantidade", "(%)", "Média do Preço","Mediana do Preço")
+
+knitr::kable(df1,align = "c")
+
+df1 <- dados %>% filter(TIPO_ANUNCIO=="ALUGUEL")
+df1 <- df1 %>% group_by(BAIRRO) %>% 
+  summarise(qt = sum(REF) , 
+            pct = round(100*(sum(REF)/nrow(df1)),2), 
+            media= mean(VALOR),
+            med=median(VALOR)) %>% arrange(desc(qt))
+
+df3<-df1
+
+df1$qt<-format_quant(df1$qt)
+df1$pct<-format_pct(df1$pct)
+df1$media<-format_real(df1$media)
+df1$med<-format_real(df1$med)
+
+names(df1) <- c("Bairro", "Quantidade", "(%)", "Média do Preço","Mediana do Preço")
+
+knitr::kable(df1,align = "c")
+
+```
+
+## c.	Velocidade de locação por tipo de imóvel e por bairro;
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# nao tem como
+```
+
+## d.	Velocidade de vendas por tipo de imóvel e por bairro;
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# nao tem como
+```
+
+## e.	Quais variáveis impactam mais no preço de venda e valor de locação (locação bairo, área, vagas, condomínio, locação/quadra);
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Pupe
+```
+
+## f.	Clusters de locação e venda;
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Pupe
+```
+
+## g.	Caprate por bairro;
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Rafael
+library(tidyverse)
+df1<-df2 %>% inner_join(df3,by="BAIRRO")
+df1$CAP_RATE_Médio<-round(100*(df1$media.y/df1$media.x),2)
+df1$CAP_RATE_Médio<-format_pct(df1$CAP_RATE_Médio)
+df1$CAP_RATE_Mediano<-round(100*(df1$med.y/df1$med.x),2)
+df1$CAP_RATE_Mediano<-format_pct(df1$CAP_RATE_Mediano)
+
+df1<-df1[,c(1,10,11)]
+
+knitr::kable(df1,align = "c")
+
+
+```
+
+## h.	Evolução dos preços desde o primeiro levantamento de scrapping até a data atual; cresceram acima de quais indicadores? Estagnaram?
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Pupe
+```
+
+## i.	Preço médio dos lançamentos; caracterização dos lançamentos (tamanho, localização, vagas).
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Rafael
+```
+
+## j.	Qualquer outra informação que você julgar relevante para melhor compreender o mercado imobiliário de Brasília.
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Pupe
+```
